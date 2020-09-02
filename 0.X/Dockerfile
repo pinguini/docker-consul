@@ -1,5 +1,4 @@
-FROM alpine:3.12
-LABEL org.opencontainers.image.authors="Consul Team <consul@hashicorp.com>"
+FROM centos:7
 
 # This is the release of Consul to pull in.
 ENV CONSUL_VERSION=1.8.3
@@ -7,19 +6,15 @@ ENV CONSUL_VERSION=1.8.3
 # This is the location of the releases.
 ENV HASHICORP_RELEASES=https://releases.hashicorp.com
 
-# Create a consul user and group first so the IDs get set the same way, even as
-# the rest of this may change over time.
-RUN addgroup consul && \
-    adduser -S -G consul consul
-
 # Set up certificates, base tools, and Consul.
 # libc6-compat is needed to symlink the shared libraries for ARM builds
 RUN set -eux && \
-    apk add --no-cache ca-certificates curl dumb-init gnupg libcap openssl su-exec iputils jq libc6-compat && \
-    gpg --keyserver pgp.mit.edu --recv-keys 91A6E7F85D05C65630BEF18951852D87348FFC4C && \
+    adduser -r consul && \
+    yum install -y wget unzip curl gnupg libcap openssl su-exec iputils jq libc6-compat && \
+    gpg  --keyserver hkp://pool.sks-keyservers.net:80 --recv-keys 91A6E7F85D05C65630BEF18951852D87348FFC4C && \
     mkdir -p /tmp/build && \
     cd /tmp/build && \
-    apkArch="$(apk --print-arch)" && \
+    apkArch="$(arch)" && \
     case "${apkArch}" in \
         aarch64) consulArch='arm64' ;; \
         armhf) consulArch='armhfv6' ;; \
@@ -35,11 +30,13 @@ RUN set -eux && \
     unzip -d /bin consul_${CONSUL_VERSION}_linux_${consulArch}.zip && \
     cd /tmp && \
     rm -rf /tmp/build && \
-    gpgconf --kill all && \
-    apk del gnupg openssl && \
     rm -rf /root/.gnupg && \
+    yum clean all && \
+    rm -rf /var/cache/yum/* && \
 # tiny smoke test to ensure the binary we downloaded runs
     consul version
+
+#    gpgconf --kill all && \
 
 # The /consul/data dir is used by Consul to store state. The agent will be started
 # with /consul/config as the configuration directory so you can add additional
